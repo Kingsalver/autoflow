@@ -31,7 +31,7 @@ CREATE TABLE workflows (
     name TEXT NOT NULL,
     trigger_config JSONB NOT NULL,
     action_config JSONB NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -45,9 +45,12 @@ CREATE TABLE workflow_executions (
     trigger_payload JSONB,
     result JSONB,
     correlation_id TEXT,
+    error_message TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Idempotency / dedup
