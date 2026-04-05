@@ -34,7 +34,7 @@ public class TriggerEventConsumer {
         topics     = "${autoflow.kafka.topics.trigger-events:workflow.trigger.events}",
         groupId    = "${autoflow.kafka.consumer-groups.workflow-engine:workflow-engine-group}",
         concurrency = "6",
-        containerFactory = "triggerEventListenerContainerFactory"
+        containerFactory = "manualAckListenerContainerFactory"
     )
     public void onTriggerEvent(ConsumerRecord<String, TriggerEvent> record, Acknowledgment ack) {
         TriggerEvent event = record.value();

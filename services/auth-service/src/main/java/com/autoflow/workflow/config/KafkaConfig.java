@@ -1,15 +1,22 @@
 package com.autoflow.workflow.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+import com.autoflow.workflow.messaging.event.ActionEvent;
 import com.autoflow.workflow.messaging.event.TriggerEvent;
 
 import java.util.HashMap;
@@ -22,6 +29,23 @@ public class KafkaConfig {
     private String bootstrapServers;
 
     /**
+     * Producer factory for ActionEvent messages.
+     */
+    @Bean
+    public ProducerFactory<String, ActionEvent> actionEventProducerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        return new DefaultKafkaProducerFactory<>(props);
+    }
+
+    @Bean
+    public KafkaTemplate<String, ActionEvent> kafkaTemplate() {
+        return new KafkaTemplate<>(actionEventProducerFactory());
+    }
+
+    /**
      * Consumer factory for TriggerEvent messages.
      * Trusted package set to our kafka package so JsonDeserializer
      * will deserialise the inbound JSON without rejecting the type.
@@ -29,7 +53,7 @@ public class KafkaConfig {
     @Bean
     public ConsumerFactory<String, TriggerEvent> triggerEventConsumerFactory() {
         JsonDeserializer<TriggerEvent> deserializer = new JsonDeserializer<>(TriggerEvent.class);
-        deserializer.addTrustedPackages("com.autoflow.workflow.kafka");
+        deserializer.addTrustedPackages("com.autoflow.*");
         deserializer.setUseTypeHeaders(false);
 
         Map<String, Object> props = new HashMap<>();
