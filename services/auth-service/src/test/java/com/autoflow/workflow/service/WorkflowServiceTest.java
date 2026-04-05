@@ -5,8 +5,6 @@ import com.autoflow.workflow.entity.Workflow;
 import com.autoflow.workflow.entity.WorkflowExecution;
 import com.autoflow.workflow.repository.WorkflowExecutionRepository;
 import com.autoflow.workflow.repository.WorkflowRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,14 +16,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +37,6 @@ class WorkflowServiceTest {
 
     @InjectMocks WorkflowService service;
 
-    private final ObjectMapper mapper = new ObjectMapper();
     private UUID userId;
     private UUID otherUserId;
 
@@ -49,21 +49,16 @@ class WorkflowServiceTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private Workflow buildWorkflow(UUID id, UUID owner) {
-        ObjectNode trigger = mapper.createObjectNode().put("type", "github.push");
-        ObjectNode action  = mapper.createObjectNode().put("type", "gmail.send");
-        return Workflow.builder()
-                .id(id)
-                .userId(owner)
-                .name("Test workflow")
-                .triggerConfig(trigger)
-                .actionConfig(action)
-                .active(true)
-                .build();
+        Map<String, Object> trigger = Map.of("type", "GITHUB_PUSH");
+        Map<String, Object> action  = Map.of("type", "SEND_EMAIL");
+        Workflow w = new Workflow(owner, "Test workflow", trigger, action);
+        ReflectionTestUtils.setField(w, "id", id);
+        return w;
     }
 
     private WorkflowRequest buildRequest(String name) {
-        ObjectNode trigger = mapper.createObjectNode().put("type", "github.push");
-        ObjectNode action  = mapper.createObjectNode().put("type", "gmail.send");
+        Map<String, Object> trigger = Map.of("type", "GITHUB_PUSH");
+        Map<String, Object> action  = Map.of("type", "SEND_EMAIL");
         return new WorkflowRequest(name, trigger, action, true);
     }
 
@@ -112,7 +107,6 @@ class WorkflowServiceTest {
         @DisplayName("throws 404 when workflow belongs to a different user")
         void throws404ForOtherUser() {
             UUID id = UUID.randomUUID();
-            // Simulates the DB returning nothing when userId doesn't match
             when(workflowRepo.findByIdAndUserId(id, otherUserId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getWorkflow(id, otherUserId))
@@ -170,7 +164,7 @@ class WorkflowServiceTest {
         @DisplayName("throws 400 when triggerConfig is null")
         void rejectsNullTriggerConfig() {
             WorkflowRequest req = new WorkflowRequest("name", null,
-                    mapper.createObjectNode(), true);
+                    Map.of("type", "SEND_EMAIL"), true);
 
             assertThatThrownBy(() -> service.createWorkflow(req, userId))
                     .isInstanceOf(ResponseStatusException.class)
@@ -193,12 +187,10 @@ class WorkflowServiceTest {
             when(workflowRepo.findByIdAndUserId(id, userId)).thenReturn(Optional.of(existing));
             when(workflowRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            // Only updating the name
             WorkflowRequest req = new WorkflowRequest("New name", null, null, null);
             Workflow result = service.updateWorkflow(id, req, userId);
 
             assertThat(result.getName()).isEqualTo("New name");
-            // triggerConfig unchanged
             assertThat(result.getTriggerConfig()).isEqualTo(existing.getTriggerConfig());
         }
 
@@ -259,12 +251,10 @@ class WorkflowServiceTest {
             Workflow w = buildWorkflow(workflowId, userId);
             when(workflowRepo.findByIdAndUserId(workflowId, userId)).thenReturn(Optional.of(w));
 
-            WorkflowExecution exec = WorkflowExecution.builder()
-                    .id(UUID.randomUUID())
-                    .workflowId(workflowId)
-                    .userId(userId)
-                    .status(WorkflowExecution.Status.SUCCESS)
-                    .build();
+            WorkflowExecution exec = new WorkflowExecution(w, userId, UUID.randomUUID().toString(),
+                    Map.of("event", "push"));
+            exec.markRunning();
+            exec.markSuccess(Map.of("result", "ok"));
 
             var page = new PageImpl<>(List.of(exec), PageRequest.of(0, 20), 1);
             when(executionRepo.findByWorkflowIdAndUserIdOrderByCreatedAtDesc(
