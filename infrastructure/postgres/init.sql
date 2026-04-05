@@ -29,6 +29,7 @@ CREATE TABLE workflows (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
+    description TEXT,
     trigger_config JSONB NOT NULL,
     action_config JSONB NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
