@@ -22,31 +22,6 @@
 
 # Docker
 **/docker-compose.override.yml
-Now create your .env.example — this is what gets committed to git as documentation:
-bashtouch .env.example
-Paste this into it:
-bash# PostgreSQL
-POSTGRES_DB=autoflow
-POSTGRES_USER=autoflow_user
-POSTGRES_PASSWORD=changeme
-POSTGRES_PORT=5432
 
-# Redis
-REDIS_PORT=6379
-
-# Kafka
-KAFKA_PORT=9092
-ZOOKEEPER_PORT=2181
-
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=changeme
-MINIO_API_PORT=9000
-MINIO_CONSOLE_PORT=9001
-
-# Auth Service
-AUTH_SERVICE_PORT=8081
-JWT_SECRET=changeme_use_a_long_random_string
-
-# Workflow Engine
-WORKFLOW_ENGINE_PORT=8082
+# SQL client scratch files
+*.session.sql

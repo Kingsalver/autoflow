@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Maven exploded artifacts (leaked classpath resources) ###
+META-INF/
+org/
