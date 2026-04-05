@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -17,9 +18,12 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Invoked by Spring Security after a successful OAuth2 login.
@@ -44,6 +48,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final CookieUtil cookieUtil;
     private final AppProperties props;
 
+    private final RestClient restClient = RestClient.create();
+
     @Override
     @Transactional
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -54,8 +60,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         OAuth2User oauthUser = oauthToken.getPrincipal();
         String registrationId = oauthToken.getAuthorizedClientRegistrationId(); // "github"
 
-        // ── 1. Extract user info from GitHub user-info response ───────────────
-        String email       = resolveEmail(oauthUser, registrationId);
+        // ── 1. Load the authorized client first (needed for private email fallback) ──
+        OAuth2AuthorizedClient client = authorizedClientService
+                .loadAuthorizedClient(registrationId, oauthToken.getName());
+
+        // ── 2. Extract user info from GitHub user-info response ───────────────
+        String email       = resolveEmail(oauthUser, registrationId, client);
         String displayName = resolveDisplayName(oauthUser);
 
         if (email == null) {
@@ -64,7 +74,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             return;
         }
 
-        // ── 2. Upsert user ────────────────────────────────────────────────────
+        // ── 3. Upsert user ────────────────────────────────────────────────────
         User user = userRepository.findByEmail(email)
                 .map(existing -> {
                     existing.setDisplayName(displayName);
@@ -74,10 +84,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                         User.builder().email(email).displayName(displayName).build()
                 ));
 
-        // ── 3. Upsert provider token ─────────────────────────────────────────
-        OAuth2AuthorizedClient client = authorizedClientService
-                .loadAuthorizedClient(registrationId, oauthToken.getName());
-
+        // ── 4. Upsert provider token ─────────────────────────────────────────
         if (client != null && client.getAccessToken() != null) {
             String accessToken  = client.getAccessToken().getTokenValue();
             String refreshToken = client.getRefreshToken() != null
@@ -97,22 +104,52 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             oauthTokenRepository.save(tokenRecord);
         }
 
-        // ── 4 + 5. Issue JWTs and write cookies ───────────────────────────────
+        // ── 5 + 6. Issue JWTs and write cookies ───────────────────────────────
         String userId = user.getId().toString();
         cookieUtil.addAccessTokenCookie(response, jwtUtil.issueAccessToken(userId, email));
         cookieUtil.addRefreshTokenCookie(response, jwtUtil.issueRefreshToken(userId));
 
-        // ── 6. Redirect to frontend ───────────────────────────────────────────
+        // ── 7. Redirect to frontend ───────────────────────────────────────────
         log.info("Successful login for user {} via {}", email, registrationId);
         getRedirectStrategy().sendRedirect(request, response, props.getFrontend().getRedirectUrl());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private String resolveEmail(OAuth2User user, String registrationId) {
-        // GitHub returns email directly in user-info (if public) or as null
+    private String resolveEmail(OAuth2User user, String registrationId, OAuth2AuthorizedClient client) {
         Object email = user.getAttribute("email");
-        return email != null ? email.toString() : null;
+        if (email != null) return email.toString();
+
+        // GitHub users with private emails: the /user endpoint returns null for email.
+        // Fall back to /user/emails to find the primary verified address.
+        if ("github".equals(registrationId) && client != null
+                && client.getAccessToken() != null) {
+            String accessToken = client.getAccessToken().getTokenValue();
+            try {
+                List<Map<String, Object>> emails = restClient.get()
+                        .uri("https://api.github.com/user/emails")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .header("Accept", "application/vnd.github+json")
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<>() {});
+
+                if (emails != null) {
+                    return emails.stream()
+                            .filter(e -> Boolean.TRUE.equals(e.get("verified"))
+                                      && Boolean.TRUE.equals(e.get("primary")))
+                            .map(e -> (String) e.get("email"))
+                            .findFirst()
+                            .or(() -> emails.stream()
+                                    .filter(e -> Boolean.TRUE.equals(e.get("verified")))
+                                    .map(e -> (String) e.get("email"))
+                                    .findFirst())
+                            .orElse(null);
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to fetch GitHub private emails: {}", ex.getMessage());
+            }
+        }
+        return null;
     }
 
     private String resolveDisplayName(OAuth2User user) {

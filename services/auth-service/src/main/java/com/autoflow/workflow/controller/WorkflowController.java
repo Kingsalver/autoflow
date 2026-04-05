@@ -1,7 +1,7 @@
 package com.autoflow.workflow.controller;
 
 import com.autoflow.workflow.dto.WorkflowRequest;
-import com.autoflow.workflow.entity.Workflow;
+import com.autoflow.workflow.dto.WorkflowResponse;
 import com.autoflow.workflow.entity.WorkflowExecution;
 import com.autoflow.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
@@ -23,29 +23,34 @@ public class WorkflowController {
 
     // GET /workflows
     @GetMapping
-    public ResponseEntity<List<Workflow>> list(Authentication auth) {
-        return ResponseEntity.ok(workflowService.listWorkflows(userId(auth)));
+    public ResponseEntity<List<WorkflowResponse>> list(Authentication auth) {
+        return ResponseEntity.ok(
+            workflowService.listWorkflows(userId(auth))
+                .stream()
+                .map(WorkflowResponse::from)
+                .toList()
+        );
     }
 
     // POST /workflows
     @PostMapping
-    public ResponseEntity<Workflow> create(@RequestBody WorkflowRequest req, Authentication auth) {
-        Workflow created = workflowService.createWorkflow(req, userId(auth));
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<WorkflowResponse> create(@RequestBody WorkflowRequest req, Authentication auth) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(WorkflowResponse.from(workflowService.createWorkflow(req, userId(auth))));
     }
 
     // GET /workflows/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<Workflow> get(@PathVariable UUID id, Authentication auth) {
-        return ResponseEntity.ok(workflowService.getWorkflow(id, userId(auth)));
+    public ResponseEntity<WorkflowResponse> get(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(WorkflowResponse.from(workflowService.getWorkflow(id, userId(auth))));
     }
 
     // PUT /workflows/{id}
     @PutMapping("/{id}")
-    public ResponseEntity<Workflow> update(@PathVariable UUID id,
+    public ResponseEntity<WorkflowResponse> update(@PathVariable UUID id,
                                     @RequestBody WorkflowRequest req,
                                     Authentication auth) {
-        return ResponseEntity.ok(workflowService.updateWorkflow(id, req, userId(auth)));
+        return ResponseEntity.ok(WorkflowResponse.from(workflowService.updateWorkflow(id, req, userId(auth))));
     }
 
     // DELETE /workflows/{id}

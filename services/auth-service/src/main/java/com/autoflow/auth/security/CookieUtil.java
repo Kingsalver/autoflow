@@ -2,10 +2,14 @@ package com.autoflow.auth.security;
 
 import com.autoflow.auth.config.AppProperties;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * Creates HttpOnly cookies with consistent security attributes.
@@ -45,6 +49,15 @@ public class CookieUtil {
     public void clearAuthCookies(HttpServletResponse response) {
         response.addHeader("Set-Cookie", buildCookie(JwtAuthFilter.ACCESS_COOKIE_NAME, "", "/", 0).toString());
         response.addHeader("Set-Cookie", buildCookie(JwtAuthFilter.REFRESH_COOKIE_NAME, "", "/auth/refresh", 0).toString());
+    }
+
+    /** Extracts a named cookie value from the request, returning empty if absent. */
+    public static Optional<String> extractCookie(HttpServletRequest request, String name) {
+        if (request.getCookies() == null) return Optional.empty();
+        return Arrays.stream(request.getCookies())
+                .filter(c -> name.equals(c.getName()))
+                .map(Cookie::getValue)
+                .findFirst();
     }
 
     private ResponseCookie buildCookie(String name, String value, String path, long maxAgeSeconds) {

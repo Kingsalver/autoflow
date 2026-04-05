@@ -40,6 +40,8 @@ public class WorkflowMatcherService {
         Map<String, Object> triggerConfig = workflow.getTriggerConfig();
         Map<String, Object> payload = event.payload();
 
+        if (payload == null) return false;
+
         for (Map.Entry<String, Object> condition : triggerConfig.entrySet()) {
             String key = condition.getKey();
 

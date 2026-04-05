@@ -40,7 +40,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(appProperties.getFrontend().getRedirectUrl()));
+        config.setAllowedOrigins(List.of(appProperties.getFrontend().getUrl()));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true); // required for HttpOnly cookie auth
@@ -55,7 +55,11 @@ public class SecurityConfig {
         http
             .securityMatcher(request -> request.getRequestURI()
                     .startsWith(request.getContextPath() + "/actuator"))
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
+                    .permitAll()
+                    .anyRequest().denyAll()
+            )
             .csrf(AbstractHttpConfigurer::disable);
         return http.build();
     }

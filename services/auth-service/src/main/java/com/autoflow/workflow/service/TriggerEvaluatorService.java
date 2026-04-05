@@ -125,15 +125,23 @@ public class TriggerEvaluatorService {
             mergedConfig
         );
 
+        // Block on the future so a Kafka publish failure throws CompletionException,
+        // propagates out of evaluate(), prevents ack.acknowledge() in the consumer,
+        // and lets Kafka redeliver the trigger event.
         actionEventProducer.publishAction(actionEvent)
             .whenComplete((result, ex) -> {
                 if (ex != null) {
                     log.error(
-                        "Action event publish failed [executionId={}, correlationId={}] — " +
-                        "execution persisted but action not dispatched",
+                        "Action event publish failed [executionId={}, correlationId={}]",
                         execution.getId(), execution.getCorrelationId(), ex
                     );
+                } else {
+                    log.info(
+                        "Action event published [executionId={}, correlationId={}]",
+                        execution.getId(), execution.getCorrelationId()
+                    );
                 }
-            });
+            })
+            .join();
     }
 }

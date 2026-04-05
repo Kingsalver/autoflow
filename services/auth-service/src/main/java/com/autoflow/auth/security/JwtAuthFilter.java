@@ -4,7 +4,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,7 +41,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
 
-        extractCookie(request, ACCESS_COOKIE_NAME)
+        CookieUtil.extractCookie(request, ACCESS_COOKIE_NAME)
                 .flatMap(this::tryValidate)
                 .ifPresent(claims -> {
                     var auth = new UsernamePasswordAuthenticationToken(
@@ -56,14 +54,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 });
 
         chain.doFilter(request, response);
-    }
-
-    private Optional<String> extractCookie(HttpServletRequest request, String name) {
-        if (request.getCookies() == null) return Optional.empty();
-        return Arrays.stream(request.getCookies())
-                .filter(c -> name.equals(c.getName()))
-                .map(Cookie::getValue)
-                .findFirst();
     }
 
     private Optional<Claims> tryValidate(String token) {

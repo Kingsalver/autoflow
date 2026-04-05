@@ -72,7 +72,7 @@ public class WorkflowService {
         // Verify the workflow belongs to this user before exposing its executions
         getWorkflow(workflowId, userId);
 
-        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
+        Pageable pageable = PageRequest.of(page, Math.max(1, Math.min(size, 100)));
         return executionRepo.findByWorkflowIdAndUserIdOrderByCreatedAtDesc(
                 workflowId, userId, pageable);
     }

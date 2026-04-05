@@ -22,15 +22,25 @@ public class AppProperties {
         private int refreshTokenExpiryDays = 7;
     }
 
+    private Encryption encryption = new Encryption();
+
     @Getter @Setter
     public static class Frontend {
-        private String redirectUrl = "http://localhost:3000";
+        private String redirectUrl = "http://localhost:3000/dashboard";
+        /** CORS allowed origin — scheme+host+port only, no path. */
+        private String url = "http://localhost:3000";
     }
 
     @Getter @Setter
     public static class Cookie {
         private boolean secure = false;
         private String sameSite = "Lax";
+    }
+
+    @Getter @Setter
+    public static class Encryption {
+        private String secret;
+        private String salt;
     }
 }
 

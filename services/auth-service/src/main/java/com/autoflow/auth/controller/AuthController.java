@@ -8,7 +8,6 @@ import com.autoflow.auth.security.JwtAuthFilter;
 import com.autoflow.auth.security.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +18,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Arrays;
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -58,7 +55,7 @@ public class AuthController {
      */
     @PostMapping("/refresh")
     public ResponseEntity<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = extractCookie(request, JwtAuthFilter.REFRESH_COOKIE_NAME)
+        String refreshToken = CookieUtil.extractCookie(request, JwtAuthFilter.REFRESH_COOKIE_NAME)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No refresh token"));
 
         try {
@@ -86,20 +83,10 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-        extractCookie(request, JwtAuthFilter.ACCESS_COOKIE_NAME)
+        CookieUtil.extractCookie(request, JwtAuthFilter.ACCESS_COOKIE_NAME)
                 .ifPresent(jwtUtil::blocklist);
 
         cookieUtil.clearAuthCookies(response);
         return ResponseEntity.noContent().build();
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private Optional<String> extractCookie(HttpServletRequest request, String name) {
-        if (request.getCookies() == null) return Optional.empty();
-        return Arrays.stream(request.getCookies())
-                .filter(c -> name.equals(c.getName()))
-                .map(Cookie::getValue)
-                .findFirst();
     }
 }

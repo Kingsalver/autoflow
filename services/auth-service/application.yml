@@ -52,9 +52,32 @@ app:
     refresh-token-expiry-days: 7
 
   frontend:
-    redirect-url: ${FRONTEND_REDIRECT_URL:http://localhost:3000}
+    redirect-url: ${FRONTEND_URL:http://localhost:3000}/dashboard
+    # Origin only (scheme+host+port) — used for CORS allowed-origins
+    url: ${FRONTEND_URL:http://localhost:3000}
 
   cookie:
     # Set to true in production with HTTPS
     secure: ${COOKIE_SECURE:false}
     same-site: Lax
+
+  encryption:
+    # AES-256-CBC passphrase for OAuth provider token encryption at rest
+    secret: ${ENCRYPTION_SECRET}
+    # 16 random bytes as a 32-char hex string — generate with: python3 -c "import secrets; print(secrets.token_hex(16))"
+    salt: ${ENCRYPTION_SALT:deadbeefdeadbeef0011223344556677}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+autoflow:
+  kafka:
+    topics:
+      trigger-events: workflow.trigger.events
+      action-events: workflow.action.events
+      action-retries: workflow.action.retries
+    consumer-groups:
+      workflow-engine: workflow-engine-group

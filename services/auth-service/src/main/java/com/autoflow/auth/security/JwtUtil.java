@@ -4,6 +4,7 @@ import com.autoflow.auth.config.AppProperties;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -36,11 +37,18 @@ public class JwtUtil {
     private final AppProperties props;
     private final StringRedisTemplate redis;
 
+    private SecretKey cachedSigningKey;
+
+    @PostConstruct
+    private void init() {
+        byte[] keyBytes = Decoders.BASE64.decode(props.getJwt().getSecret());
+        this.cachedSigningKey = Keys.hmacShaKeyFor(keyBytes);
+    }
+
     // ── Key ──────────────────────────────────────────────────────────────────
 
     private SecretKey signingKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(props.getJwt().getSecret());
-        return Keys.hmacShaKeyFor(keyBytes);
+        return cachedSigningKey;
     }
 
     // ── Issue ────────────────────────────────────────────────────────────────

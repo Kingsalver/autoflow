@@ -28,6 +28,9 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    @Value("${autoflow.kafka.consumer-groups.workflow-engine:workflow-engine-group}")
+    private String consumerGroupId;
+
     /**
      * Producer factory for ActionEvent messages.
      */
@@ -58,7 +61,7 @@ public class KafkaConfig {
 
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "workflow-engine");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false); // manual ack
 

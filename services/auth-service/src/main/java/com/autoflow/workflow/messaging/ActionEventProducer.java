@@ -15,16 +15,22 @@ public class ActionEventProducer {
 
     private static final Logger log = LoggerFactory.getLogger(ActionEventProducer.class);
 
+    /** Maximum delivery attempts before an event is dropped instead of re-queued. */
+    static final int MAX_ATTEMPTS = 5;
+
     private final KafkaTemplate<String, ActionEvent> kafkaTemplate;
+    private final String actionEventsTopic;
+    private final String actionRetriesTopic;
 
-    @Value("${autoflow.kafka.topics.action-events:workflow.action.events}")
-    private String actionEventsTopic;
-
-    @Value("${autoflow.kafka.topics.action-retries:workflow.action.retries}")
-    private String actionRetriesTopic;
-
-    public ActionEventProducer(KafkaTemplate<String, ActionEvent> kafkaTemplate) {
+    public ActionEventProducer(
+            KafkaTemplate<String, ActionEvent> kafkaTemplate,
+            @Value("${autoflow.kafka.topics.action-events:workflow.action.events}")
+            String actionEventsTopic,
+            @Value("${autoflow.kafka.topics.action-retries:workflow.action.retries}")
+            String actionRetriesTopic) {
         this.kafkaTemplate = kafkaTemplate;
+        this.actionEventsTopic = actionEventsTopic;
+        this.actionRetriesTopic = actionRetriesTopic;
     }
 
     /**
@@ -59,8 +65,20 @@ public class ActionEventProducer {
     /**
      * Publishes a failed action to {@code workflow.action.retries} with an
      * incremented attempt counter for exponential backoff processing.
+     *
+     * If the event has already reached {@link #MAX_ATTEMPTS}, it is dropped
+     * and a warning is logged rather than re-enqueued indefinitely.
      */
     public CompletableFuture<SendResult<String, ActionEvent>> publishRetry(ActionEvent originalEvent) {
+        if (originalEvent.attempt() >= MAX_ATTEMPTS - 1) {
+            log.warn(
+                "Max retry attempts ({}) reached — dropping event to avoid infinite retry " +
+                "[correlationId={}, actionType={}]",
+                MAX_ATTEMPTS, originalEvent.correlationId(), originalEvent.actionType()
+            );
+            return CompletableFuture.completedFuture(null);
+        }
+
         ActionEvent retryEvent = originalEvent.withIncrementedAttempt();
 
         log.warn(
