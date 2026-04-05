@@ -58,10 +58,24 @@ server:
   servlet:
     context-path: /api/v1
 
+# Binds to JwtProperties (com.autoflow.auth.config.JwtProperties)
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiry-ms: 900000       # 15 minutes
   refresh-token-expiry-ms: 604800000   # 7 days
+
+# Binds to AppProperties (com.autoflow.auth.config.AppProperties)
+# JwtUtil and CookieUtil read jwt.secret and expiry values from here.
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiry-minutes: 15
+    refresh-token-expiry-days: 7
+  frontend:
+    redirect-url: ${FRONTEND_URL:http://localhost:3000}
+  cookie:
+    secure: false
+    same-site: Lax
 
 management:
   endpoints:
@@ -70,4 +84,4 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: always
