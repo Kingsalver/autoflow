@@ -1,0 +1,83 @@
+server:
+  port: ${AUTH_SERVICE_PORT:8081}
+
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB:autoflow}
+    username: ${POSTGRES_USER:autoflow_user}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Schema is owned by init.sql — never let Hibernate touch it
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        "[format_sql]": true
+
+  data:
+    redis:
+      host: localhost
+      port: ${REDIS_PORT:6379}
+
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${GITHUB_CLIENT_ID}
+            client-secret: ${GITHUB_CLIENT_SECRET}
+            scope:
+              - read:user
+              - user:email
+            redirect-uri: "{baseUrl}/auth/callback/github"
+        provider:
+          github:
+            authorization-uri: https://github.com/login/oauth/authorize
+            token-uri: https://github.com/login/oauth/access_token
+            user-info-uri: https://api.github.com/user
+            user-name-attribute: login
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    # Access token: short-lived. Stored in HttpOnly cookie.
+    access-token-expiry-minutes: 15
+    # Refresh token: long-lived. Stored in HttpOnly cookie scoped to /auth/refresh.
+    refresh-token-expiry-days: 7
+
+  frontend:
+    redirect-url: ${FRONTEND_URL:http://localhost:3000}/dashboard
+    # Origin only (scheme+host+port) — used for CORS allowed-origins
+    url: ${FRONTEND_URL:http://localhost:3000}
+
+  cookie:
+    # Set to true in production with HTTPS
+    secure: ${COOKIE_SECURE:false}
+    same-site: Lax
+
+  encryption:
+    # AES-256-CBC passphrase for OAuth provider token encryption at rest
+    secret: ${ENCRYPTION_SECRET}
+    # 16 random bytes as a 32-char hex string — generate with: python3 -c "import secrets; print(secrets.token_hex(16))"
+    salt: ${ENCRYPTION_SALT:deadbeefdeadbeef0011223344556677}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+autoflow:
+  kafka:
+    topics:
+      trigger-events: workflow.trigger.events
+      action-events: workflow.action.events
+      action-retries: workflow.action.retries
+    consumer-groups:
+      workflow-engine: workflow-engine-group
